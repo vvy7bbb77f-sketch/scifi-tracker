@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ficção Científica — Tracker de Leitura</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080c14;
+      --surface:   #0e1520;
+      --border:    #1c2740;
+      --text:      #c8d4e8;
+      --muted:     #8a9dc0;
+      --tier-a:    #f0c040;
+      --tier-b:    #38c8d4;
+      --tier-c:    #a478f0;
+      --tier-d:    #6a7a90;
+      --read-bg:   #0d2b1a;
+      --read-text: #3ddc84;
+      --read-line: #2a7a50;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 17px;
+      line-height: 1.65;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── STARFIELD ── */
+    #stars {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .star {
+      position: absolute;
+      border-radius: 50%;
+      background: #fff;
+      animation: twinkle var(--dur, 4s) ease-in-out infinite var(--delay, 0s);
+      opacity: 0;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: 0; }
+      50%       { opacity: var(--max-op, 0.6); }
+    }
+
+    /* ── LAYOUT ── */
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    /* ── HEADER ── */
+    header { margin-bottom: 48px; }
+
+    .eyebrow {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    h1 {
+      font-family: 'Space Mono', monospace;
+      font-size: clamp(22px, 5vw, 34px);
+      font-weight: 700;
+      color: #e8f0ff;
+      line-height: 1.15;
+      letter-spacing: -0.01em;
+      margin-bottom: 14px;
+    }
+
+    .subtitle {
+      font-size: 15px;
+      color: var(--muted);
+      max-width: 480px;
+    }
+
+    /* ── PROGRESS BAR ── */
+    .progress-wrap {
+      margin: 28px 0 48px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .progress-bar-outer {
+      flex: 1;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-bar-inner {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--read-line), var(--read-text));
+      transition: width 0.5s cubic-bezier(.25,.8,.25,1);
+      width: 0%;
+    }
+    .progress-label {
+      font-family: 'Space Mono', monospace;
+      font-size: 12px;
+      color: var(--read-text);
+      white-space: nowrap;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    /* ── TIER SECTION ── */
+    .tier-section { margin-bottom: 40px; }
+
+    .tier-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+    }
+
+    .tier-badge {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      padding: 3px 10px;
+      border-radius: 4px;
+      border: 1px solid currentColor;
+    }
+
+    .tier-desc {
+      font-size: 13px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .tier-divider {
+      height: 1px;
+      background: var(--border);
+      margin-bottom: 10px;
+    }
+
+    /* ── BOOK ITEM ── */
+    .book {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: start;
+      gap: 8px 16px;
+      padding: 13px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+      border: 1px solid transparent;
+      user-select: none;
+      margin-bottom: 4px;
+    }
+
+    .book:hover:not(.read) {
+      background: var(--surface);
+      border-color: var(--border);
+    }
+
+    .book:focus-visible {
+      outline: 2px solid var(--read-text);
+      outline-offset: 2px;
+    }
+
+    .book.read {
+      background: var(--read-bg);
+      border-color: var(--read-line);
+    }
+
+    .book-main { display: flex; flex-direction: column; gap: 2px; }
+
+    .book-title {
+      font-size: 17px;
+      font-weight: 500;
+      color: #dce8ff;
+      transition: color 0.2s, text-decoration-color 0.2s;
+      text-decoration: line-through;
+      text-decoration-color: transparent;
+      text-underline-offset: 3px;
+    }
+
+    .book.read .book-title {
+      color: var(--read-text);
+      text-decoration-color: var(--read-line);
+    }
+
+    .book-author {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .book-note {
+      font-size: 13px;
+      color: var(--muted);
+      font-style: italic;
+      opacity: 0.85;
+    }
+
+    .book-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 2px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .book.read .book-check {
+      background: var(--read-text);
+      border-color: var(--read-text);
+    }
+
+    .book-check svg {
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .book.read .book-check svg { opacity: 1; }
+
+    /* ── TIER COLORS ── */
+    .tier-a .tier-badge { color: var(--tier-a); border-color: var(--tier-a); }
+    .tier-a .tier-divider { background: color-mix(in srgb, var(--tier-a) 30%, transparent); }
+
+    .tier-b .tier-badge { color: var(--tier-b); border-color: var(--tier-b); }
+    .tier-b .tier-divider { background: color-mix(in srgb, var(--tier-b) 30%, transparent); }
+
+    .tier-c .tier-badge { color: var(--tier-c); border-color: var(--tier-c); }
+    .tier-c .tier-divider { background: color-mix(in srgb, var(--tier-c) 30%, transparent); }
+
+    .tier-d .tier-badge { color: var(--tier-d); border-color: var(--tier-d); }
+    .tier-d .tier-divider { background: color-mix(in srgb, var(--tier-d) 30%, transparent); }
+
+    /* ── FOOTER ── */
+    footer {
+      margin-top: 56px;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      text-align: center;
+      letter-spacing: 0.06em;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .star { animation: none; }
+      .book, .book-title, .book-check, .book-check svg, .progress-bar-inner { transition: none; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="stars"></div>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Tracker de Leitura</p>
+    <h1>Ficção Científica</h1>
+    <p class="subtitle">Clique em um livro para marcá-lo como lido. Seu progresso é salvo automaticamente no navegador.</p>
+  </header>
+
+  <div class="progress-wrap" aria-label="Progresso geral de leitura">
+    <div class="progress-bar-outer">
+      <div class="progress-bar-inner" id="progressBar"></div>
+    </div>
+    <div class="progress-label" id="progressLabel">0 / 25</div>
+  </div>
+
+  <div id="bookList"></div>
+
+  <footer>Eduardo · TJPI · 2026</footer>
+</div>
+
+<script>
+  /* ── STARFIELD ── */
+  (function () {
+    const container = document.getElementById('stars');
+    const count = 120;
+    for (let i = 0; i < count; i++) {
+      const s = document.createElement('div');
+      s.className = 'star';
+      const size = Math.random() * 2 + 0.5;
+      s.style.cssText = `
+        width: ${size}px; height: ${size}px;
+        left: ${Math.random() * 100}%;
+        top: ${Math.random() * 100}%;
+        --dur: ${(Math.random() * 6 + 2).toFixed(1)}s;
+        --delay: ${(Math.random() * 8).toFixed(1)}s;
+        --max-op: ${(Math.random() * 0.5 + 0.1).toFixed(2)};
+      `;
+      container.appendChild(s);
+    }
+  })();
+
+  /* ── DATA ── */
+  const TIERS = [
+    {
+      id: 'A',
+      label: 'TIER A',
+      desc: 'Leitura imediata — prioridade máxima',
+      books: [
+        { id: 'a1', title: 'The Mote in God\'s Eye',      author: 'Larry Niven e Jerry Pournelle', note: 'Primeiro contato alienígena' },
+        { id: 'a2', title: 'Childhood\'s End',             author: 'Arthur C. Clarke',              note: 'Grande ideia cósmica' },
+        { id: 'a3', title: 'The Fountains of Paradise',   author: 'Arthur C. Clarke',              note: 'Engenharia e tecnologia' },
+        { id: 'a4', title: 'Pushing Ice',                 author: 'Alastair Reynolds',             note: 'Mistério espacial' },
+        { id: 'a5', title: 'Eon',                         author: 'Greg Bear',                     note: 'Megaestrutura misteriosa' },
+        { id: 'a6', title: 'Saturn Run',                  author: 'John Sandford e Ctein',         note: 'Hard sci-fi moderna' },
+        { id: 'a7', title: 'A Deepness in the Sky',       author: 'Vernor Vinge',                  note: 'Exploração e contato alienígena' },
+      ]
+    },
+    {
+      id: 'B',
+      label: 'TIER B',
+      desc: 'Recomendações sólidas — leitura recomendada',
+      books: [
+        { id: 'b1', title: 'Dragon\'s Egg',       author: 'Robert L. Forward',    note: 'Conceito alienígena extraordinário' },
+        { id: 'b2', title: 'The Forever War',     author: 'Joe Haldeman',         note: 'Clássico militar' },
+        { id: 'b3', title: 'Contact',             author: 'Carl Sagan',           note: 'Semelhante ao espírito de Clarke' },
+        { id: 'b4', title: 'Tau Zero',            author: 'Poul Anderson',        note: 'Viagem interestelar' },
+        { id: 'b5', title: 'Ringworld',           author: 'Larry Niven',          note: 'Megaestrutura colossal' },
+        { id: 'b6', title: 'Leviathan Wakes',     author: 'James S. A. Corey',   note: 'Mistério espacial' },
+        { id: 'b7', title: 'House of Suns',       author: 'Alastair Reynolds',    note: 'Escopo gigantesco' },
+      ]
+    },
+    {
+      id: 'C',
+      label: 'TIER C',
+      desc: 'Bons livros — com ressalvas',
+      books: [
+        { id: 'c1', title: 'Foundation',                    author: 'Isaac Asimov',        note: 'Clássico fragmentado' },
+        { id: 'c2', title: 'The Caves of Steel',            author: 'Isaac Asimov',        note: 'Romance linear' },
+        { id: 'c3', title: 'The Moon Is a Harsh Mistress',  author: 'Robert A. Heinlein', note: 'Influente e divertido' },
+        { id: 'c4', title: 'Blindsight',                    author: 'Peter Watts',         note: 'Mais sombrio e complexo' },
+        { id: 'c5', title: 'Revelation Space',              author: 'Alastair Reynolds',   note: 'Mais complexo' },
+        { id: 'c6', title: 'A Fire Upon the Deep',          author: 'Vernor Vinge',        note: 'Mais denso' },
+      ]
+    },
+    {
+      id: 'D',
+      label: 'TIER D',
+      desc: 'Talvez não valha o esforço',
+      books: [
+        { id: 'd1', title: 'Dune',                author: 'Frank Herbert',   note: 'Mais político e filosófico' },
+        { id: 'd2', title: 'Book of the New Sun', author: 'Gene Wolfe',      note: 'Muito literário' },
+        { id: 'd3', title: 'Anathem',             author: 'Neal Stephenson', note: 'Ritmo lento' },
+        { id: 'd4', title: 'Diaspora',            author: 'Greg Egan',       note: 'Muito abstrato' },
+        { id: 'd5', title: 'Hyperion',            author: 'Dan Simmons',     note: 'Você não gostou' },
+      ]
+    }
+  ];
+
+  const STORAGE_KEY = 'scifi_read_v1';
+
+  /* ── STATE ── */
+  function loadRead() {
+    try { return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')); }
+    catch { return new Set(); }
+  }
+  function saveRead(set) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
+  }
+
+  const readSet = loadRead();
+
+  /* ── RENDER ── */
+  function buildCheckIcon() {
+    return `<svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+      <path d="M1 4L3.5 6.5L9 1" stroke="#0d2b1a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  }
+
+  const container = document.getElementById('bookList');
+  const total = TIERS.reduce((s, t) => s + t.books.length, 0);
+
+  TIERS.forEach(tier => {
+    const section = document.createElement('section');
+    section.className = `tier-section tier-${tier.id.toLowerCase()}`;
+    section.setAttribute('aria-label', `Tier ${tier.id}`);
+
+    const header = document.createElement('div');
+    header.className = 'tier-header';
+    header.innerHTML = `<span class="tier-badge">${tier.label}</span><span class="tier-desc">${tier.desc}</span>`;
+    section.appendChild(header);
+
+    const divider = document.createElement('div');
+    divider.className = 'tier-divider';
+    section.appendChild(divider);
+
+    tier.books.forEach(book => {
+      const el = document.createElement('div');
+      el.className = 'book' + (readSet.has(book.id) ? ' read' : '');
+      el.setAttribute('role', 'checkbox');
+      el.setAttribute('aria-checked', readSet.has(book.id) ? 'true' : 'false');
+      el.setAttribute('tabindex', '0');
+      el.setAttribute('aria-label', `${book.title} — ${book.author}`);
+      el.dataset.id = book.id;
+
+      el.innerHTML = `
+        <div class="book-main">
+          <span class="book-title">${book.title}</span>
+          <span class="book-author">${book.author}</span>
+          <span class="book-note">${book.note}</span>
+        </div>
+        <div class="book-check">${buildCheckIcon()}</div>
+      `;
+
+      function toggle() {
+        const id = el.dataset.id;
+        if (readSet.has(id)) {
+          readSet.delete(id);
+          el.classList.remove('read');
+          el.setAttribute('aria-checked', 'false');
+        } else {
+          readSet.add(id);
+          el.classList.add('read');
+          el.setAttribute('aria-checked', 'true');
+        }
+        saveRead(readSet);
+        updateProgress();
+      }
+
+      el.addEventListener('click', toggle);
+      el.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } });
+
+      section.appendChild(el);
+    });
+
+    container.appendChild(section);
+  });
+
+  /* ── PROGRESS ── */
+  function updateProgress() {
+    const count = readSet.size;
+    const pct = (count / total) * 100;
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = `${count} / ${total}`;
+  }
+
+  updateProgress();
+</script>
+</body>
+</html>
